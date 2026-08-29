@@ -1,19 +1,17 @@
 name: Build and Deploy Metrics Charts
 
 on:
-  push:
-    paths:
-      - '*.xlsx'
-      - '*.xls'
-  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # Runs automatically every 6 hours
+  workflow_dispatch:        # Allows manual button trigger from GitHub Actions tab
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 jobs:
-  build-and-deploy:
+  check-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -26,15 +24,33 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pandas openpyxl plotly
+          pip install pandas openpyxl plotly google-api-python-client google-auth
+
+      - name: Check and Download from Google Drive
+        id: gdrive_check
+        env:
+          GDRIVE_SERVICE_ACCOUNT_KEY: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_KEY }}
+        run: python sync_gdrive.py
+
+      - name: Commit and Push if Updated
+        if: steps.gdrive_check.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add metrics.xlsx
+          git commit -m "Auto-update Excel file from Google Drive"
+          git push
 
       - name: Generate HTML Charts
+        if: steps.gdrive_check.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
         run: python generate_charts.py
 
       - name: Upload Page Artifact
+        if: steps.gdrive_check.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'public'
 
       - name: Deploy to GitHub Pages
+        if: steps.gdrive_check.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/deploy-pages@v4
