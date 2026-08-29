@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import glob
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -27,13 +28,23 @@ files = results.get('files', [])
 
 if not files:
     print("No Excel files found in Google Drive folder.")
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+        fh.write("has_changes=false\n")
     exit(0)
 
 latest_file = files[0]
 file_id = latest_file['id']
-file_name = "metrics.xlsx"  # Standardized local file name
 
-# 3. Download file into memory
+# Dynamically set target filename or fall back to existing .xlsx file in repo
+existing_xlsx = glob.glob("*.xlsx")
+if existing_xlsx:
+    file_name = existing_xlsx[0]  # Keeps current repo filename (e.g., Fitdays--ームさん(1).xlsx)
+else:
+    file_name = latest_file['name']  # Uses filename from Google Drive if none exists yet
+
+print(f"Target Excel file: {file_name}")
+
+# 3. Download file content into memory
 request = service.files().get_media(fileId=file_id)
 fh = io.BytesIO()
 downloader = MediaIoBaseDownload(fh, request)
@@ -43,18 +54,17 @@ while not done:
 
 new_content = fh.getvalue()
 
-# 4. Check if file has actually changed
+# 4. Compare content with existing file
 if os.path.exists(file_name):
     with open(file_name, 'rb') as f:
         existing_content = f.read()
     if existing_content == new_content:
         print("No changes detected in Google Drive file. Exiting.")
-        # Set an environment output for the workflow to skip commit
         with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
             fh.write("has_changes=false\n")
         exit(0)
 
-# 5. Save updated file
+# 5. Overwrite file with new content
 with open(file_name, 'wb') as f:
     f.write(new_content)
 
