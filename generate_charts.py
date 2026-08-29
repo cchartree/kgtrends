@@ -60,6 +60,33 @@ for col in metrics:
         margin=dict(l=20, r=20, t=40, b=20),
         hovermode="x unified",
     )
+    
+    # 1. Update line traces to hide markers
+    fig.update_traces(
+        mode='lines',              # Shows lines only (no markers/dots)
+        line=dict(width=2.5)       # Optional: Adjust line thickness
+    )
+    
+    # 2. Update layout for white background, horizontal gridlines only, and no X-axis title
+    fig.update_layout(
+        plot_bgcolor='white',      # Chart area background
+        paper_bgcolor='white',     # Outer canvas background
+        
+        # X-Axis settings
+        xaxis=dict(
+            title_text='',         # Removes the X-axis title
+            showgrid=False,        # Removes vertical gridlines
+            showline=True,         # Shows bottom axis baseline
+            linecolor='#e0e0e0'
+        ),
+        
+        # Y-Axis settings
+        yaxis=dict(
+            showgrid=True,         # Keeps horizontal gridlines
+            gridcolor='#f0f0f0',   # Light grey color for subtle gridlines
+            showline=False
+        )
+    )
 
     # Append standalone div for mobile rendering
     html_content.append(fig.to_html(full_html=False, include_plotlyjs="cdn"))
