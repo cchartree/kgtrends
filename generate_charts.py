@@ -36,7 +36,7 @@ if not df.empty:
 # 4. Process each metric column and build HTML components
 metrics = [col for col in df.columns if col not in ["Date", "Clean_Date"]]
 html_content = [
-    "<html><head><title>Body Metrics Dashboard (180 Days)</title>",
+    "<html><head><title>Kg trends (180 Days)</title>",
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     "<style>body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }</style>",
     "</head><body>",
