@@ -40,7 +40,7 @@ html_content = [
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     "<style>body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }</style>",
     "</head><body>",
-    "<h1 style='text-align:center;'>Body Metrics (Last 180 Days)</h1>",
+    "<h1 style='text-align:center;'>Kg trends (180 Days)</h1>",
 ]
 
 for col in metrics:
