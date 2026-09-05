@@ -19,6 +19,13 @@ df["Clean_Date"] = pd.to_datetime(
     errors="coerce",
 )
 df = df.dropna(subset=["Clean_Date"]).sort_values("Clean_Date")
+df = df.rename(columns={'Weight': 'Weight (kg)', 'Body Fat': ' Body Fat (%)', 'Subcutaneous fat': 'Subcutaneous Fat (%)', 
+                        'Body Water': 'Body Water (%)', 'Skeletal Muscle': ' Skeletal Muscle (%)', 'Muscle mass': 'Muscle Mass (kg)', 
+                        'Bone Mass': 'Bone Mass (kg)', 'Protein': 'Protein (%)', 'BMR': 'BMR (kcal)', 'Fat mass': 'Fat Mass (kg)', 
+                        'Water weight': 'Water Weight (kg)', 'Muscle rate': 'Muscle Rate (%)', 'Protein mass': 'Protein Mass (kg)', 
+                        'Obesity': 'Obesity (%)', 'Fat-free Body Weight': 'Fat-free Body Weight (kg)', 'SMI': 'Skeletal Muscle Index (kg/m2)', 
+                        'Recommended target weight': 'Recommended Target Weight (kg)', 'Weight control': 'Weight Control (kg)', 
+                        'Fat control': 'Fat Control (kg)', 'Skeletal muscle': 'Skeletal Muscle (kg)'})
 
 # 3. Filter for only the last 180 days relative to the latest record
 if not df.empty:
