@@ -34,11 +34,19 @@ if not df.empty:
     df = df[df["Clean_Date"] >= cutoff_date]
 
 # 4. Process each metric column and build HTML components
+
+# Fixed pixel dimensions applied to every chart (no responsive resizing)
+CHART_WIDTH = 700
+CHART_HEIGHT = 400
+
 metrics = [col for col in df.columns if col not in ["Date", "Clean_Date"]]
 html_content = [
     "<html><head><title>Kg trends (180 Days)</title>",
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    "<style>body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }</style>",
+    "<style>",
+    "body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }",
+    ".plotly-graph-div { margin: 0 auto 20px auto; }",
+    "</style>",
     "</head><body>",
     "<h1 style='text-align:center;'>Kg trends (180 Days)</h1>",
 ]
@@ -54,26 +62,28 @@ for col in metrics:
     if df[col].dropna().empty:
         continue
 
-    fig = px.line(
+    fig = px.area(
         df,
         x="Clean_Date",
         y=col,
         title=f"<b>{col}</b>",
-        markers=True,
         labels={"Clean_Date": "Date", col: col},
     )
     fig.update_layout(
-        autosize=True,
+        autosize=False,
+        width=CHART_WIDTH,
+        height=CHART_HEIGHT,
         margin=dict(l=20, r=20, t=40, b=20),
         hovermode="x unified",
     )
-    
-    # 1. Update line traces to hide markers
+
+    # 1. Update area traces: turquoise line + turquoise fill shading
     fig.update_traces(
-        mode='lines',              # Shows lines only (no markers/dots)
-        line=dict(width=2.5)       # Optional: Adjust line thickness
+        mode='lines',                       # Shows lines only (no markers/dots)
+        line=dict(width=2.5, color='#40E0D0'),   # Turquoise line
+        fillcolor='rgba(64, 224, 208, 0.35)',    # Turquoise shaded fill
     )
-    
+
     # 2. Update layout for white background, horizontal gridlines only, and no X-axis title
     fig.update_layout(
         plot_bgcolor='white',      # Chart area background
@@ -91,12 +101,21 @@ for col in metrics:
         yaxis=dict(
             showgrid=True,         # Keeps horizontal gridlines
             gridcolor='#f0f0f0',   # Light grey color for subtle gridlines
-            showline=False
+            showline=False,
+            tickformat=',.1f'      # Thousand separators + 1 decimal place
         )
     )
 
-    # Append standalone div for mobile rendering
-    html_content.append(fig.to_html(full_html=False, include_plotlyjs="cdn"))
+    # Append standalone div with fixed pixel dimensions (no responsive autosize)
+    html_content.append(
+        fig.to_html(
+            full_html=False,
+            include_plotlyjs="cdn",
+            config={"responsive": False},
+            default_width=f"{CHART_WIDTH}px",
+            default_height=f"{CHART_HEIGHT}px",
+        )
+    )
 
 html_content.append("</body></html>")
 
