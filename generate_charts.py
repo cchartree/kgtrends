@@ -36,8 +36,8 @@ if not df.empty:
 # 4. Process each metric column and build HTML components
 
 # Fixed pixel dimensions applied to every chart (no responsive resizing)
-CHART_WIDTH = 700
-CHART_HEIGHT = 400
+CHART_WIDTH = 400
+CHART_HEIGHT = 200
 
 metrics = [col for col in df.columns if col not in ["Date", "Clean_Date"]]
 html_content = [
@@ -61,6 +61,18 @@ for col in metrics:
 
     if df[col].dropna().empty:
         continue
+
+    # Compute a y-axis range that does NOT start at 0: pad below the data's
+    # minimum by 50% of the data range (max - min) so variation is visible.
+    data_min = df[col].dropna().min()
+    data_max = df[col].dropna().max()
+    data_range = data_max - data_min
+    if data_range == 0:
+        # Flat series: fall back to a small padding based on magnitude
+        padding = abs(data_max) * 0.05 if data_max != 0 else 1
+    else:
+        padding = data_range * 0.5
+    yaxis_range = [data_min - padding, data_max + padding * 0.2]
 
     fig = px.area(
         df,
@@ -102,7 +114,9 @@ for col in metrics:
             showgrid=True,         # Keeps horizontal gridlines
             gridcolor='#f0f0f0',   # Light grey color for subtle gridlines
             showline=False,
-            tickformat=',.1f'      # Thousand separators + 1 decimal place
+            tickformat=',.1f',     # Thousand separators + 1 decimal place
+            range=yaxis_range,     # Data-driven range, padded below (not starting at 0)
+            autorange=False
         )
     )
 
