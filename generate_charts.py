@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 import re
 import pandas as pd
@@ -27,31 +28,69 @@ df = df.rename(columns={'Weight': 'Weight (kg)', 'Body Fat': ' Body Fat (%)', 'S
                         'Recommended target weight': 'Recommended Target Weight (kg)', 'Weight control': 'Weight Control (kg)', 
                         'Fat control': 'Fat Control (kg)', 'Skeletal muscle': 'Skeletal Muscle (kg)'})
 
-# 3. Filter for only the last 180 days relative to the latest record
+# 3. Keep the last 24 months of data so every filter button (up to "Last 24
+#    months") has data available to display. The default on-page-load view is
+#    set to "Last 180 days" via the filter bar below.
 if not df.empty:
     latest_date = df["Clean_Date"].max()
-    cutoff_date = latest_date - pd.Timedelta(days=180)
+    cutoff_date = latest_date - pd.DateOffset(months=24)
     df = df[df["Clean_Date"] >= cutoff_date]
 
 # 4. Process each metric column and build HTML components
 
 # Fixed pixel dimensions applied to every chart (no responsive resizing)
 CHART_WIDTH = 400
-CHART_HEIGHT = 200
+CHART_HEIGHT = 300
+
+# Font sizing: 10% smaller than Plotly's normal defaults (base=12, title=17)
+BASE_FONT_SIZE = round(12 * 0.9, 1)    # 10.8
+TITLE_FONT_SIZE = round(17 * 0.9, 1)   # 15.3
 
 metrics = [col for col in df.columns if col not in ["Date", "Clean_Date"]]
+
+# Filter bar definitions: (label, unit type, value)
+FILTER_OPTIONS = [
+    ("Last 7 days", "days", 7),
+    ("Last 30 days", "days", 30),
+    ("Last 60 days", "days", 60),
+    ("Last 90 days", "days", 90),
+    ("Last 180 days", "days", 180),
+    ("Last 12 months", "months", 12),
+    ("Last 18 months", "months", 18),
+    ("Last 24 months", "months", 24),
+]
+DEFAULT_FILTER = ("days", 180)
+
+filter_buttons_html = "".join(
+    f'<button class="filter-btn" data-type="{unit}" data-value="{value}" '
+    f'onclick="applyFilter(this)">{label}</button>'
+    for label, unit, value in FILTER_OPTIONS
+)
+
 html_content = [
-    "<html><head><title>Kg trends (180 Days)</title>",
+    "<html><head><title>Metric Trends</title>",
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     "<style>",
     "body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }",
     ".plotly-graph-div { margin: 0 auto 20px auto; }",
+    ".charts-wrap { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }",
+    ".filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; "
+    "margin: 0 auto 20px auto; max-width: 900px; }",
+    ".filter-btn { font-family: inherit; font-size: 12.6px; padding: 6px 12px; "
+    "border: 1px solid #40E0D0; border-radius: 16px; background: white; color: #1a1a1a; "
+    "cursor: pointer; transition: background 0.15s, color 0.15s; }",
+    ".filter-btn:hover { background: #d4f7f2; }",
+    ".filter-btn.active { background: #40E0D0; color: white; border-color: #40E0D0; }",
     "</style>",
     "</head><body>",
-    "<h1 style='text-align:center;'>Kg trends (180 Days)</h1>",
+    "<h1 style='text-align:center;'>Metric Trends</h1>",
+    f'<div class="filter-bar">{filter_buttons_html}</div>',
+    '<div class="charts-wrap">',
 ]
 
-for col in metrics:
+chart_div_ids = []
+
+for i, col in enumerate(metrics):
     # Extract value prior to brackets and remove non-numeric chars except decimals
     clean_s = df[col].astype(str)
     clean_s = clean_s.apply(lambda x: re.split(r"\(", x)[0] if "(" in x else x)
@@ -74,6 +113,9 @@ for col in metrics:
         padding = data_range * 0.5
     yaxis_range = [data_min - padding, data_max + padding * 0.2]
 
+    div_id = f"chart_{i}"
+    chart_div_ids.append(div_id)
+
     fig = px.area(
         df,
         x="Clean_Date",
@@ -87,6 +129,12 @@ for col in metrics:
         height=CHART_HEIGHT,
         margin=dict(l=20, r=20, t=40, b=20),
         hovermode="x unified",
+        font=dict(size=BASE_FONT_SIZE),   # All fonts 10% smaller than default
+        title=dict(
+            font=dict(size=TITLE_FONT_SIZE),  # Title font 10% smaller than default
+            x=0,                              # Left-justify the title
+            xanchor="left",
+        ),
     )
 
     # 1. Update area traces: turquoise line + turquoise fill shading
@@ -128,12 +176,56 @@ for col in metrics:
             config={"responsive": False},
             default_width=f"{CHART_WIDTH}px",
             default_height=f"{CHART_HEIGHT}px",
+            div_id=div_id,
         )
     )
 
+html_content.append("</div>")  # close .charts-wrap
+
+# 5. Embed the cross-chart filter script: clicking a button relayouts every
+#    chart's x-axis range to the selected window, anchored to the latest date.
+latest_date_iso = df["Clean_Date"].max().strftime("%Y-%m-%d") if not df.empty else ""
+filter_script = f"""
+<script>
+var CHART_IDS = {json.dumps(chart_div_ids)};
+var LATEST_DATE = "{latest_date_iso}";
+
+function applyFilter(btn) {{
+    document.querySelectorAll('.filter-btn').forEach(function(b) {{ b.classList.remove('active'); }});
+    btn.classList.add('active');
+
+    var type = btn.getAttribute('data-type');
+    var value = parseInt(btn.getAttribute('data-value'), 10);
+
+    var latest = new Date(LATEST_DATE);
+    var cutoff = new Date(LATEST_DATE);
+    if (type === 'days') {{
+        cutoff.setDate(cutoff.getDate() - value);
+    }} else if (type === 'months') {{
+        cutoff.setMonth(cutoff.getMonth() - value);
+    }}
+
+    var startISO = cutoff.toISOString().slice(0, 10);
+    var endISO = latest.toISOString().slice(0, 10);
+
+    CHART_IDS.forEach(function(id) {{
+        Plotly.relayout(id, {{'xaxis.range': [startISO, endISO]}});
+    }});
+}}
+
+window.addEventListener('load', function() {{
+    var defaultBtn = document.querySelector(
+        '.filter-btn[data-type="{DEFAULT_FILTER[0]}"][data-value="{DEFAULT_FILTER[1]}"]'
+    );
+    if (defaultBtn) {{ applyFilter(defaultBtn); }}
+}});
+</script>
+"""
+html_content.append(filter_script)
+
 html_content.append("</body></html>")
 
-# 5. Save to build directory
+# 6. Save to build directory
 os.makedirs("public", exist_ok=True)
 with open("public/index.html", "w", encoding="utf-8") as f:
     f.writelines(html_content)
