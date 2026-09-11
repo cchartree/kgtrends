@@ -210,8 +210,8 @@ function applyFilter(btn) {{
             var ys = gd.data[0].y;
             var visibleYs = [];
             for (var j = 0; j < xs.length; j++) {{
-                var t = new Date(xs[j]).getTime();
-                if (t >= startTime && t <= endTime) {{
+                var t = parsePlotlyDate(xs[j]);
+                if (!isNaN(t) && t >= startTime && t <= endTime) {{
                     var v = ys[j];
                     if (v !== null && v !== undefined && !isNaN(v)) {{
                         visibleYs.push(v);
@@ -233,6 +233,26 @@ function applyFilter(btn) {{
 
         Plotly.relayout(id, update);
     }});
+}}
+
+// Safari / Chrome-on-iOS's Date parser is strict about ISO 8601: it only
+// accepts 3-digit millisecond fractions, but Plotly serializes x-values with
+// 6-digit microsecond precision (e.g. "2026-06-18T00:00:00.000000"). Safari
+// silently returns Invalid Date -> NaN for that string (Chrome/V8 on desktop
+// is lenient and parses it fine, which is why this only broke on iPhone).
+// That made every point fail the visible-range check, so the y-axis never
+// got recalculated on iOS. This truncates the fraction to milliseconds
+// before parsing.
+function parsePlotlyDate(v) {{
+    if (v instanceof Date) {{ return v.getTime(); }}
+    if (typeof v === 'number') {{ return v; }}
+    var s = String(v).trim().replace(' ', 'T');
+    s = s.replace(/(\\.\\d{{3}})\\d+/, '$1');
+    var t = new Date(s).getTime();
+    if (!isNaN(t)) {{ return t; }}
+    var m = String(v).match(/^(\\d{{4}})-(\\d{{2}})-(\\d{{2}})/);
+    if (m) {{ return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getTime(); }}
+    return NaN;
 }}
 
 window.addEventListener('load', function() {{
