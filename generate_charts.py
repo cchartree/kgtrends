@@ -73,7 +73,7 @@ html_content = [
     "<style>",
     "body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }",
     ".plotly-graph-div { margin: 0 auto 20px auto; }",
-    ".charts-wrap { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }",
+    ".charts-wrap { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }",
     ".filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; "
     "margin: 0 auto 20px auto; max-width: 900px; }",
     ".filter-btn { font-family: inherit; font-size: 12.6px; padding: 6px 12px; "
@@ -218,6 +218,30 @@ window.addEventListener('load', function() {{
         '.filter-btn[data-type="{DEFAULT_FILTER[0]}"][data-value="{DEFAULT_FILTER[1]}"]'
     );
     if (defaultBtn) {{ applyFilter(defaultBtn); }}
+}});
+
+// Mobile Chrome/Safari (iOS) keep the tapped data label pinned on screen
+// because a tap on a data point fires Plotly's hover but there is no
+// corresponding "unhover" when tapping outside the chart. Explicitly clear
+// the hover label on every chart whenever a tap/click lands outside all
+// chart divs.
+function dismissAllHoverLabels() {{
+    CHART_IDS.forEach(function(id) {{
+        var gd = document.getElementById(id);
+        if (gd) {{ Plotly.Fx.hover(gd, []); }}
+    }});
+}}
+
+document.addEventListener('touchstart', function(e) {{
+    if (!(e.target.closest && e.target.closest('.plotly-graph-div'))) {{
+        dismissAllHoverLabels();
+    }}
+}}, {{ passive: true }});
+
+document.addEventListener('click', function(e) {{
+    if (!(e.target.closest && e.target.closest('.plotly-graph-div'))) {{
+        dismissAllHoverLabels();
+    }}
 }});
 </script>
 """
