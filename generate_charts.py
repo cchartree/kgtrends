@@ -89,6 +89,7 @@ html_content = [
 ]
 
 chart_div_ids = []
+chart_data = {}  # div_id -> [[ "YYYY-MM-DD", value ], ...] for JS-side filtering
 
 for i, col in enumerate(metrics):
     # Extract value prior to brackets and remove non-numeric chars except decimals
@@ -103,6 +104,16 @@ for i, col in enumerate(metrics):
 
     div_id = f"chart_{i}"
     chart_div_ids.append(div_id)
+
+    # Precompute plain (date, value) pairs for this metric ourselves, rather
+    # than relying on parsing them back out of Plotly's rendered trace later.
+    # This is generated straight from the dataframe, so it's independent of
+    # whatever internal string format / timing Plotly uses at render time.
+    valid = df[["Clean_Date", col]].dropna(subset=[col])
+    chart_data[div_id] = [
+        [d.strftime("%Y-%m-%d"), float(v)]
+        for d, v in zip(valid["Clean_Date"], valid[col])
+    ]
 
     fig = px.area(
         df,
@@ -174,12 +185,24 @@ for i, col in enumerate(metrics):
 html_content.append("</div>")  # close .charts-wrap
 
 # 5. Embed the cross-chart filter script: clicking a button relayouts every
-#    chart's x-axis range to the selected window, anchored to the latest date.
+#    chart's x-axis AND y-axis range to the selected window, anchored to the
+#    latest date. Uses CHART_DATA (embedded below) rather than reading values
+#    back out of each Plotly div, so it does not depend on Plotly's internal
+#    trace format or on rendering having finished.
 latest_date_iso = df["Clean_Date"].max().strftime("%Y-%m-%d") if not df.empty else ""
 filter_script = f"""
 <script>
 var CHART_IDS = {json.dumps(chart_div_ids)};
+var CHART_DATA = {json.dumps(chart_data)};
 var LATEST_DATE = "{latest_date_iso}";
+
+// All date math is done in UTC explicitly (Date.UTC / getUTC* / setUTC*)
+// rather than mixing UTC-parsed dates with local-time mutator methods
+// (setDate/setMonth), which would silently drift by the viewer's UTC offset.
+function isoToUTCms(iso) {{
+    var parts = iso.split('-');
+    return Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+}}
 
 function applyFilter(btn) {{
     document.querySelectorAll('.filter-btn').forEach(function(b) {{ b.classList.remove('active'); }});
@@ -188,71 +211,53 @@ function applyFilter(btn) {{
     var type = btn.getAttribute('data-type');
     var value = parseInt(btn.getAttribute('data-value'), 10);
 
-    var latest = new Date(LATEST_DATE);
-    var cutoff = new Date(LATEST_DATE);
+    var endTime = isoToUTCms(LATEST_DATE);
+    var cutoff = new Date(endTime);
     if (type === 'days') {{
-        cutoff.setDate(cutoff.getDate() - value);
+        cutoff.setUTCDate(cutoff.getUTCDate() - value);
     }} else if (type === 'months') {{
-        cutoff.setMonth(cutoff.getMonth() - value);
+        cutoff.setUTCMonth(cutoff.getUTCMonth() - value);
     }}
-
-    var startISO = cutoff.toISOString().slice(0, 10);
-    var endISO = latest.toISOString().slice(0, 10);
     var startTime = cutoff.getTime();
-    var endTime = latest.getTime();
+
+    var startISO = new Date(startTime).toISOString().slice(0, 10);
+    var endISO = new Date(endTime).toISOString().slice(0, 10);
 
     CHART_IDS.forEach(function(id) {{
-        var gd = document.getElementById(id);
         var update = {{'xaxis.range': [startISO, endISO]}};
+        var points = CHART_DATA[id] || [];
+        var visibleYs = [];
 
-        if (gd && gd.data && gd.data[0]) {{
-            var xs = gd.data[0].x;
-            var ys = gd.data[0].y;
-            var visibleYs = [];
-            for (var j = 0; j < xs.length; j++) {{
-                var t = parsePlotlyDate(xs[j]);
-                if (!isNaN(t) && t >= startTime && t <= endTime) {{
-                    var v = ys[j];
-                    if (v !== null && v !== undefined && !isNaN(v)) {{
-                        visibleYs.push(v);
-                    }}
+        for (var j = 0; j < points.length; j++) {{
+            var t = isoToUTCms(points[j][0]);
+            if (t >= startTime && t <= endTime) {{
+                var v = points[j][1];
+                if (v !== null && v !== undefined && !isNaN(v)) {{
+                    visibleYs.push(v);
                 }}
-            }}
-            if (visibleYs.length > 0) {{
-                var yMin = Math.min.apply(null, visibleYs);
-                var yMax = Math.max.apply(null, visibleYs);
-                var yRange = yMax - yMin;
-                // 20% below the visible minimum, 20% above the visible maximum
-                var yPadding = yRange === 0
-                    ? (yMax !== 0 ? Math.abs(yMax) * 0.2 : 1)
-                    : yRange * 0.2;
-                update['yaxis.range'] = [yMin - yPadding, yMax + yPadding];
-                update['yaxis.autorange'] = false;
             }}
         }}
 
-        Plotly.relayout(id, update);
-    }});
-}}
+        if (visibleYs.length > 0) {{
+            var yMin = Math.min.apply(null, visibleYs);
+            var yMax = Math.max.apply(null, visibleYs);
+            var yRange = yMax - yMin;
+            // 20% below the visible minimum, 20% above the visible maximum
+            var yPadding = yRange === 0
+                ? (yMax !== 0 ? Math.abs(yMax) * 0.2 : 1)
+                : yRange * 0.2;
+            update['yaxis.range'] = [yMin - yPadding, yMax + yPadding];
+            update['yaxis.autorange'] = false;
+        }}
 
-// Safari / Chrome-on-iOS's Date parser is strict about ISO 8601: it only
-// accepts 3-digit millisecond fractions, but Plotly serializes x-values with
-// 6-digit microsecond precision (e.g. "2026-06-18T00:00:00.000000"). Safari
-// silently returns Invalid Date -> NaN for that string (Chrome/V8 on desktop
-// is lenient and parses it fine, which is why this only broke on iPhone).
-// That made every point fail the visible-range check, so the y-axis never
-// got recalculated on iOS. This truncates the fraction to milliseconds
-// before parsing.
-function parsePlotlyDate(v) {{
-    if (v instanceof Date) {{ return v.getTime(); }}
-    if (typeof v === 'number') {{ return v; }}
-    var s = String(v).trim().replace(' ', 'T');
-    s = s.replace(/(\\.\\d{{3}})\\d+/, '$1');
-    var t = new Date(s).getTime();
-    if (!isNaN(t)) {{ return t; }}
-    var m = String(v).match(/^(\\d{{4}})-(\\d{{2}})-(\\d{{2}})/);
-    if (m) {{ return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getTime(); }}
-    return NaN;
+        try {{
+            if (typeof Plotly !== 'undefined' && document.getElementById(id)) {{
+                Plotly.relayout(id, update);
+            }}
+        }} catch (err) {{
+            console.error('Filter relayout failed for', id, err);
+        }}
+    }});
 }}
 
 window.addEventListener('load', function() {{
