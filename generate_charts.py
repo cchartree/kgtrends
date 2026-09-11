@@ -101,18 +101,6 @@ for i, col in enumerate(metrics):
     if df[col].dropna().empty:
         continue
 
-    # Compute a y-axis range that does NOT start at 0: pad below the data's
-    # minimum by 50% of the data range (max - min) so variation is visible.
-    data_min = df[col].dropna().min()
-    data_max = df[col].dropna().max()
-    data_range = data_max - data_min
-    if data_range == 0:
-        # Flat series: fall back to a small padding based on magnitude
-        padding = abs(data_max) * 0.05 if data_max != 0 else 1
-    else:
-        padding = data_range * 0.5
-    yaxis_range = [data_min - padding, data_max + padding * 0.2]
-
     div_id = f"chart_{i}"
     chart_div_ids.append(div_id)
 
@@ -157,16 +145,19 @@ for i, col in enumerate(metrics):
             linecolor='#e0e0e0'
         ),
         
-        # Y-Axis settings
+        # Y-Axis settings: range is intentionally left on autorange here.
+        # The filter bar's JS recomputes it per click, scoped to whichever
+        # metric values fall inside the selected date window (see
+        # `applyFilter` below: 20% padding above the visible max, 20% below
+        # the visible min).
         yaxis=dict(
             showgrid=True,         # Keeps horizontal gridlines
             gridcolor='#f0f0f0',   # Light grey color for subtle gridlines
             showline=False,
             tickformat=',.1f',     # Thousand separators + 1 decimal place
-            range=yaxis_range,     # Data-driven range, padded below (not starting at 0)
-            autorange=False
         )
     )
+
 
     # Append standalone div with fixed pixel dimensions (no responsive autosize)
     html_content.append(
@@ -207,9 +198,40 @@ function applyFilter(btn) {{
 
     var startISO = cutoff.toISOString().slice(0, 10);
     var endISO = latest.toISOString().slice(0, 10);
+    var startTime = cutoff.getTime();
+    var endTime = latest.getTime();
 
     CHART_IDS.forEach(function(id) {{
-        Plotly.relayout(id, {{'xaxis.range': [startISO, endISO]}});
+        var gd = document.getElementById(id);
+        var update = {{'xaxis.range': [startISO, endISO]}};
+
+        if (gd && gd.data && gd.data[0]) {{
+            var xs = gd.data[0].x;
+            var ys = gd.data[0].y;
+            var visibleYs = [];
+            for (var j = 0; j < xs.length; j++) {{
+                var t = new Date(xs[j]).getTime();
+                if (t >= startTime && t <= endTime) {{
+                    var v = ys[j];
+                    if (v !== null && v !== undefined && !isNaN(v)) {{
+                        visibleYs.push(v);
+                    }}
+                }}
+            }}
+            if (visibleYs.length > 0) {{
+                var yMin = Math.min.apply(null, visibleYs);
+                var yMax = Math.max.apply(null, visibleYs);
+                var yRange = yMax - yMin;
+                // 20% below the visible minimum, 20% above the visible maximum
+                var yPadding = yRange === 0
+                    ? (yMax !== 0 ? Math.abs(yMax) * 0.2 : 1)
+                    : yRange * 0.2;
+                update['yaxis.range'] = [yMin - yPadding, yMax + yPadding];
+                update['yaxis.autorange'] = false;
+            }}
+        }}
+
+        Plotly.relayout(id, update);
     }});
 }}
 
