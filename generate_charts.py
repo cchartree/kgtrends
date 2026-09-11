@@ -73,8 +73,8 @@ html_content = [
     "<style>",
     "body { font-family: -apple-system, sans-serif; padding: 10px; background: #f9f9f9; }",
     ".plotly-graph-div { margin: 0 auto 20px auto; }",
-    ".charts-wrap { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }",
-    ".filter-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; "
+    ".charts-wrap { display: flex; flex-wrap: wrap; gap: 60px; justify-content: center; }",
+    ".filter-bar { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; "
     "margin: 0 auto 20px auto; max-width: 900px; }",
     ".filter-btn { font-family: inherit; font-size: 12.6px; padding: 6px 12px; "
     "border: 1px solid #40E0D0; border-radius: 16px; background: white; color: #1a1a1a; "
