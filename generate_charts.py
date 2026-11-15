@@ -41,6 +41,12 @@ if not df.empty:
     cutoff_date = latest_date - pd.DateOffset(months=24)
     df = df[df["Clean_Date"] >= cutoff_date]
 
+# Format latest date for the page subtitle (e.g. 12-Nov-2026)
+if not df.empty:
+    latest_date_str = df["Clean_Date"].max().strftime("%d-%b-%Y")
+else:
+    latest_date_str = ""
+
 # 4. Process each metric column and build HTML components
 
 # Fixed pixel dimensions applied to every chart (no responsive resizing)
@@ -51,7 +57,10 @@ CHART_HEIGHT = 300
 BASE_FONT_SIZE = round(12 * 0.9, 1)    # 10.8
 TITLE_FONT_SIZE = round(17 * 0.9, 1)   # 15.3
 
-metrics = [col for col in df.columns if col not in ["Date", "Clean_Date"]]
+metrics = [col for col in df.columns if col not in ["Date", "Clean_Date", "Time", "Date", "Clean_Date",
+    "Obesity Level", "Body Type"]]
+
+metrics = [col for col in df.columns if col not in EXCLUDE_COLS]
 
 # Filter bar definitions: (label, unit type, value)
 FILTER_OPTIONS = [
@@ -88,7 +97,8 @@ html_content = [
     ".filter-btn.active { background: #40E0D0; color: white; border-color: #40E0D0; }",
     "</style>",
     "</head><body>",
-    "<h1 style='text-align:center;'>Metric Trends</h1>",
+    "<h1 style='text-align:center; margin-bottom:4px;'>Metric Trends</h1>",
+    f"<p style='text-align:center; margin-top:0; color:#555; font-size:15px;'>Latest data: {latest_date_str}</p>",,
     f'<div class="filter-bar">{filter_buttons_html}</div>',
     '<div class="charts-wrap">',
 ]
