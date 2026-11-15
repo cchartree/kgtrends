@@ -15,18 +15,18 @@ df = pd.read_excel(latest_file)
 
 # 2. Clean date column (extracts format like "Aug.29 2026")
 df["Clean_Date"] = pd.to_datetime(
-    df["Date"].astype(str).str.extract(r"([A-Za-z]+\.\d+\s+\d{4})")[0],
+    df["Time"].astype(str).str.extract(r"([A-Za-z]+\.\d+\s+\d{4})")[0],
     format="%b.%d %Y",
     errors="coerce",
 )
 df = df.dropna(subset=["Clean_Date"]).sort_values("Clean_Date")
-df = df.rename(columns={'Weight': 'Weight (kg)', 'Body Fat': ' Body Fat (%)', 'Subcutaneous fat': 'Subcutaneous Fat (%)', 
-                        'Body Water': 'Body Water (%)', 'Skeletal Muscle': ' Skeletal Muscle (%)', 'Muscle mass': 'Muscle Mass (kg)', 
-                        'Bone Mass': 'Bone Mass (kg)', 'Protein': 'Protein (%)', 'BMR': 'BMR (kcal)', 'Fat mass': 'Fat Mass (kg)', 
-                        'Water weight': 'Water Weight (kg)', 'Muscle rate': 'Muscle Rate (%)', 'Protein mass': 'Protein Mass (kg)', 
+df = df.rename(columns={'Weight': 'Weight (kg)', 'Body Fat': ' Body Fat (%)', 'Subcutaneous Fat': 'Subcutaneous Fat (%)', 
+                        'Body Water': 'Body Water (%)', 'Skeletal Muscle': ' Skeletal Muscle (%)', 'Muscle Mass': 'Muscle Mass (kg)', 
+                        'Bone Mass': 'Bone Mass (kg)', 'Protein': 'Protein (%)', 'BMR': 'BMR (kcal)', 'Fat Mass': 'Fat Mass (kg)', 
+                        'Water Weight': 'Water Weight (kg)', 'Muscle Rate': 'Muscle Rate (%)', 'Protein Mass': 'Protein Mass (kg)', 
                         'Obesity': 'Obesity (%)', 'Fat-free Body Weight': 'Fat-free Body Weight (kg)', 'SMI': 'Skeletal Muscle Index (kg/m2)', 
-                        'Recommended target weight': 'Recommended Target Weight (kg)', 'Weight control': 'Weight Control (kg)', 
-                        'Fat control': 'Fat Control (kg)', 'Skeletal muscle': 'Skeletal Muscle (kg)'})
+                        'Ideal Body Weight': 'Recommended Target Weight (kg)', 'Weight control': 'Weight Control (kg)', 
+                        'Fat control': 'Fat Control (kg)', 'Skeletal Muscle': 'Skeletal Muscle (kg)'})
 
 # 3. Keep the last 24 months of data so every filter button (up to "Last 24
 #    months") has data available to display. The default on-page-load view is
