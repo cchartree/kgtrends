@@ -57,9 +57,10 @@ CHART_HEIGHT = 300
 BASE_FONT_SIZE = round(12 * 0.9, 1)    # 10.8
 TITLE_FONT_SIZE = round(17 * 0.9, 1)   # 15.3
 
-metrics = [col for col in df.columns if col not in ["Date", "Clean_Date", "Time", "Date", "Clean_Date",
-    "Obesity Level", "Body Type"]]
-
+# Columns that should never become charts
+EXCLUDE_COLS = {
+    "Date", "Clean_Date", "Time", "Date", "Clean_Date", "Obesity Level", "Body Type"
+}
 metrics = [col for col in df.columns if col not in EXCLUDE_COLS]
 
 # Filter bar definitions: (label, unit type, value)
