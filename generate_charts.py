@@ -98,7 +98,7 @@ html_content = [
     "</style>",
     "</head><body>",
     "<h1 style='text-align:center; margin-bottom:4px;'>Metric Trends</h1>",
-    f"<p style='text-align:center; margin-top:0; color:#555; font-size:15px;'>Latest data: {latest_date_str}</p>",,
+    f"<p style='text-align:center; margin-top:0; color:#555; font-size:15px;'>Latest data: {latest_date_str}</p>",
     f'<div class="filter-bar">{filter_buttons_html}</div>',
     '<div class="charts-wrap">',
 ]
