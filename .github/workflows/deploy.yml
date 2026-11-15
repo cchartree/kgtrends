@@ -2,7 +2,7 @@ name: Build and Deploy Metrics Charts
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Runs automatically every 30 minutes
+    - cron: '*/10  * * * *' 
   workflow_dispatch:         # Allows manual button trigger from GitHub Actions tab
 
 permissions:
