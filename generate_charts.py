@@ -14,9 +14,14 @@ latest_file = excel_files[0]
 df = pd.read_excel(latest_file)
 
 # 2. Clean date column (extracts format like "Aug.29 2026")
+# 2. Clean date column (handles "Nov.13,2026 06:15" and similar)
+extracted = df["Time"].astype(str).str.extract(
+    r"([A-Za-z]+)\.(\d+),?\s*(\d{4})"
+)
+# extracted columns: 0=month abbr, 1=day, 2=year
 df["Clean_Date"] = pd.to_datetime(
-    df["Time"].astype(str).str.extract(r"([A-Za-z]+\.\d+\s+\d{4})")[0],
-    format="%b.%d %Y",
+    extracted[0] + " " + extracted[1] + " " + extracted[2],
+    format="%b %d %Y",
     errors="coerce",
 )
 df = df.dropna(subset=["Clean_Date"]).sort_values("Clean_Date")
