@@ -2,8 +2,8 @@ name: Build and Deploy Metrics Charts
 
 on:
   schedule:
-    - cron: '*/10  * * * *' 
-  workflow_dispatch:         # Allows manual button trigger from GitHub Actions tab
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  check-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -38,7 +38,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add "*.xlsx"
-          git commit -m "Auto-update Excel file from Google Drive"
+          git commit -m "Auto-update Excel file from Google Drive" || echo "No changes to commit"
           git push
 
       - name: Generate HTML Charts
@@ -51,6 +51,13 @@ jobs:
         with:
           path: 'public'
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
-        if: steps.gdrive_check.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
+        id: deployment
         uses: actions/deploy-pages@v4
